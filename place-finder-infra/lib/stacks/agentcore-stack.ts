@@ -52,7 +52,7 @@ export class AgentCoreStack extends cdk.Stack {
 
     this.memory = new agentcore.Memory(this, "Memory", {
       memoryName: `${props.appName}_memory`,
-      description: `${props.appName} long-term memory with user preference, semantic, and summary strategies`,
+      description: `${props.appName} long-term memory with user preference and semantic strategies`,
       memoryStrategies: [
         agentcore.MemoryStrategy.usingUserPreference({
           name: "user_preference_strategy",
@@ -61,10 +61,6 @@ export class AgentCoreStack extends cdk.Stack {
         agentcore.MemoryStrategy.usingSemantic({
           name: "semantic_strategy",
           namespaces: ["/facts/{actorId}/"],
-        }),
-        agentcore.MemoryStrategy.usingSummarization({
-          name: "summary_strategy",
-          namespaces: ["/summaries/{sessionId}/"],
         }),
       ],
     });
