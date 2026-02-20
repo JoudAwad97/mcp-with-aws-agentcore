@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "Docker image tag (defaults to git SHA)"
+        description: "Docker image tag (defaults to 'latest')"
         required: false
         type: string
 
@@ -54,7 +54,7 @@ jobs:
           if [ -n "${{ inputs.image_tag }}" ]; then
             echo "tag=${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build, tag, and push Docker image
