@@ -122,6 +122,29 @@ export class AgentCoreStack extends cdk.Stack {
     // Additional IAM permissions for the runtime execution role
     // -------------------------------------------------------------------------
 
+    // ECR — pull container image
+    this.runtime.addToRolePolicy(
+      new iam.PolicyStatement({
+        sid: "ECRPullImage",
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "ecr:BatchGetImage",
+          "ecr:GetDownloadUrlForLayer",
+        ],
+        resources: [
+          `arn:aws:ecr:${region}:${accountId}:repository/${props.appName.toLowerCase()}-*`,
+        ],
+      }),
+    );
+    this.runtime.addToRolePolicy(
+      new iam.PolicyStatement({
+        sid: "ECRAuth",
+        effect: iam.Effect.ALLOW,
+        actions: ["ecr:GetAuthorizationToken"],
+        resources: ["*"],
+      }),
+    );
+
     // Secrets Manager — read Google API key at runtime
     googleApiSecret.grantRead(this.runtime);
 
