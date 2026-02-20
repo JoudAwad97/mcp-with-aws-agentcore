@@ -1,0 +1,20 @@
+default_agent: place_finder
+is_agentcore_create_with_iac: true
+
+agents:
+  place_finder:
+    name: place_finder
+    entrypoint: agentcore
+    protocol: MCP
+    deployment_type: container
+    source_path: /
+    aws:
+      account: "339713078134"
+      region: us-east-2
+    bedrock_agentcore:
+      agent_id: ""
+      agent_arn: ""
+      agent_endpoint_id: DEFAULT
+      agent_session_id: null
+    environment: {}
+    is_generated_by_agentcore_create: true

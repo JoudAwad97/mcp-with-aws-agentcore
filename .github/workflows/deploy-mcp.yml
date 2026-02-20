@@ -1,0 +1,108 @@
+name: Build & Deploy MCP Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "place-finder-mcp/**"
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag (defaults to git SHA)"
+        required: false
+        type: string
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REPOSITORY: placefinder-mcp
+  APP_NAME: placeFinder
+
+jobs:
+  build-and-push:
+    name: Build & Push to ECR
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_uri: ${{ steps.build.outputs.image_uri }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.image_tag }}" ]; then
+            echo "tag=${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build, tag, and push Docker image
+        id: build
+        working-directory: place-finder-mcp
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          docker build --platform linux/arm64 -t "${IMAGE_URI}" .
+          docker tag "${IMAGE_URI}" "${REGISTRY}/${ECR_REPOSITORY}:latest"
+          docker push "${IMAGE_URI}"
+          docker push "${REGISTRY}/${ECR_REPOSITORY}:latest"
+          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+          echo "Pushed: ${IMAGE_URI}"
+
+  update-runtime:
+    name: Update AgentCore Runtime
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get Runtime ID
+        id: runtime
+        run: |
+          RUNTIME_ID=$(aws cloudformation describe-stacks \
+            --stack-name "${APP_NAME}-AgentCoreStack" \
+            --query "Stacks[0].Outputs[?OutputKey=='RuntimeId'].OutputValue" \
+            --output text)
+          echo "runtime_id=${RUNTIME_ID}" >> "$GITHUB_OUTPUT"
+          echo "Runtime ID: ${RUNTIME_ID}"
+
+      - name: Get Runtime Role ARN
+        id: role
+        run: |
+          ROLE_ARN=$(aws cloudformation describe-stacks \
+            --stack-name "${APP_NAME}-AgentCoreStack" \
+            --query "Stacks[0].Outputs[?OutputKey=='RuntimeArn'].OutputValue" \
+            --output text)
+          # Extract role ARN from runtime — use the execution role from the runtime
+          echo "runtime_arn=${ROLE_ARN}" >> "$GITHUB_OUTPUT"
+
+      - name: Update AgentCore Runtime
+        env:
+          IMAGE_URI: ${{ needs.build-and-push.outputs.image_uri }}
+        run: |
+          echo "Updating runtime ${{ steps.runtime.outputs.runtime_id }} with image: ${IMAGE_URI}"
+          aws bedrock-agentcore update-agent-runtime \
+            --agent-runtime-id "${{ steps.runtime.outputs.runtime_id }}" \
+            --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"${IMAGE_URI}\"}}" \
+            || echo "Note: update-agent-runtime may not be available yet. Redeploy CDK with -c imageUri=${IMAGE_URI}"
