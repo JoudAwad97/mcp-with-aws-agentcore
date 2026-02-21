@@ -103,11 +103,6 @@ export class GatewayStack extends cdk.Stack {
             },
           },
         },
-        credentialProviderConfigurations: [
-          {
-            credentialProviderType: "GATEWAY_IAM_ROLE",
-          },
-        ],
         description: "MCP server target pointing to the AgentCore Runtime",
       },
     );

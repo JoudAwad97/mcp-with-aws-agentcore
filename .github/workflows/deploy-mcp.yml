@@ -54,7 +54,7 @@ jobs:
           if [ -n "${{ inputs.image_tag }}" ]; then
             echo "tag=${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build, tag, and push Docker image
