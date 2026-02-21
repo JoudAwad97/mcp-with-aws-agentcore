@@ -37,9 +37,7 @@ export class GatewayStack extends cdk.Stack {
     // =========================================================================
 
     const gatewayRole = new iam.Role(this, "GatewayRole", {
-      assumedBy: new iam.ServicePrincipal(
-        "bedrock-agentcore.amazonaws.com",
-      ),
+      assumedBy: new iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
       description: `IAM role for ${props.appName} AgentCore Gateway`,
     });
 
@@ -52,10 +50,7 @@ export class GatewayStack extends cdk.Stack {
           "bedrock-agentcore:InvokeRuntime",
           "bedrock-agentcore:InvokeAgentRuntime",
         ],
-        resources: [
-          props.runtimeArn,
-          `${props.runtimeArn}/*`,
-        ],
+        resources: [props.runtimeArn, `${props.runtimeArn}/*`],
       }),
     );
 
@@ -91,13 +86,10 @@ export class GatewayStack extends cdk.Stack {
             },
           },
         },
-        credentialProviderConfigurations: [
-          {
-            credentialProviderType: "GATEWAY_IAM_ROLE",
-          },
-        ],
-        description:
-          "MCP server target pointing to the AgentCore Runtime",
+        // NoAuth: omit credentialProviderConfigurations entirely.
+        // MCP server targets support NoAuth (no outbound credentials).
+        // For production, use OAUTH with a registered credential provider.
+        description: "MCP server target pointing to the AgentCore Runtime",
       },
     );
 
