@@ -9,6 +9,7 @@ from fastmcp import FastMCP
 
 from src.clients.agentcore_memory_client import AgentCoreMemoryClient
 from src.config import settings
+from src.infrastructure.trace_decorator import traced
 from src.schemas.preferences import (
     PreferenceListResponse,
     StorePreferenceResponse,
@@ -59,6 +60,7 @@ def _get_client() -> AgentCoreMemoryClient:
         "openWorldHint": False,
     },
 )
+@traced(span_name="mcp.tool.store_user_preference", handler_type="tool")
 async def store_user_preference(
     actor_id: str,
     preference_text: str,
@@ -97,6 +99,7 @@ async def store_user_preference(
         "openWorldHint": False,
     },
 )
+@traced(span_name="mcp.tool.get_user_preferences", handler_type="tool")
 async def get_user_preferences(
     actor_id: str,
     query: str,

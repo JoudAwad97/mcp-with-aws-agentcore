@@ -7,8 +7,9 @@ Imported into the registry via tool_registry.py.
 
 from fastmcp import FastMCP
 
-from src.clients.open_route_service_client import OpenRouteServiceClient, VALID_PROFILES
+from src.clients.open_route_service_client import VALID_PROFILES, OpenRouteServiceClient
 from src.config import settings
+from src.infrastructure.trace_decorator import traced
 from src.schemas.routing import DirectionsResponse, GeocodeResponse
 from src.utils.route_formatters import format_directions, format_geocode_results
 
@@ -52,6 +53,7 @@ def _get_client() -> OpenRouteServiceClient:
         "openWorldHint": True,
     },
 )
+@traced(span_name="mcp.tool.get_directions", handler_type="tool")
 async def get_directions(
     start_longitude: float,
     start_latitude: float,
@@ -105,6 +107,7 @@ async def get_directions(
         "openWorldHint": True,
     },
 )
+@traced(span_name="mcp.tool.geocode", handler_type="tool")
 async def geocode(
     address: str,
     max_results: int = 5,

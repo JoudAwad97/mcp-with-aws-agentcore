@@ -2,18 +2,19 @@
 MCP Tool Registry.
 
 Aggregates all MCP servers into a single FastMCP instance with prefix namespacing.
-Syncs local prompt definitions to Bedrock on startup.
+Initializes observability and syncs local prompt definitions to Bedrock on startup.
 """
 
 from loguru import logger
 from fastmcp import FastMCP
 
-from src.servers.place_finder_server import place_finder_mcp
+from src.infrastructure.bedrock_prompt_manager import get_prompt_manager
+from src.infrastructure.observability import initialize_observability
 from src.servers.open_route_service_server import open_route_service_mcp
+from src.servers.place_finder_server import place_finder_mcp
 from src.servers.prompt_server import prompt_mcp
 from src.servers.user_preferences_server import user_preferences_mcp
 from src.servers.weather_server import weather_mcp
-from src.infrastructure.bedrock_prompt_manager import get_prompt_manager
 
 
 class McpServersRegistry:
@@ -27,6 +28,20 @@ class McpServersRegistry:
             return
 
         logger.info("Initializing MCP tool registry...")
+
+        # --- Initialize observability ---
+        try:
+            from src.config import settings
+
+            initialize_observability(
+                service_name=settings.OTEL_SERVICE_NAME,
+                enabled=settings.AGENT_OBSERVABILITY_ENABLED,
+            )
+        except Exception:
+            logger.exception(
+                "Observability initialization failed. "
+                "Tracing will be disabled."
+            )
 
         # --- Sync prompts to Bedrock before mounting ---
         try:

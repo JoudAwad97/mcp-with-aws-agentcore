@@ -9,6 +9,7 @@ from fastmcp import FastMCP
 
 from src.clients.google_places_client import GooglePlacesClient
 from src.config import settings
+from src.infrastructure.trace_decorator import traced
 from src.schemas.places import Place, PlaceSearchResponse
 from src.utils.formatters import format_place, format_places
 
@@ -50,6 +51,7 @@ def _get_client() -> GooglePlacesClient:
         "openWorldHint": True,
     },
 )
+@traced(span_name="mcp.tool.search_places", handler_type="tool")
 async def search_places(
     query: str,
     location: str = "",
@@ -98,6 +100,7 @@ async def search_places(
         "openWorldHint": True,
     },
 )
+@traced(span_name="mcp.tool.search_nearby_places", handler_type="tool")
 async def search_nearby_places(
     latitude: float,
     longitude: float,
@@ -142,6 +145,7 @@ async def search_nearby_places(
         "openWorldHint": True,
     },
 )
+@traced(span_name="mcp.tool.get_place_details", handler_type="tool")
 async def get_place_details(place_id: str) -> Place:
     """Get detailed information about a specific place.
 

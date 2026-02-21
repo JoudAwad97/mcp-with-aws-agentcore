@@ -10,6 +10,7 @@ Mounted into the registry via tool_registry.py.
 from fastmcp import FastMCP
 
 from src.infrastructure.bedrock_prompt_manager import get_prompt_manager
+from src.infrastructure.trace_decorator import traced
 
 # Import prompt modules to trigger registration in PROMPT_REGISTRY
 import src.prompts.holiday_planner_agent_scope
@@ -35,6 +36,7 @@ prompt_mcp = FastMCP("agent_prompts")
     ),
     tags={"agent-scope", "orchestration", "holiday-planner"},
 )
+@traced(span_name="mcp.prompt.holiday_planner_agent_scope", handler_type="prompt")
 async def holiday_planner_agent_scope(
     user_name: str = "",
 ) -> str:

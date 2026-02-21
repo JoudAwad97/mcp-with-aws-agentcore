@@ -43,5 +43,15 @@ class Settings(BaseSettings):
         description="TTL in seconds for the prompt text cache.",
     )
 
+    # --- Observability ---
+    AGENT_OBSERVABILITY_ENABLED: bool = Field(
+        default=True,
+        description="Enable OpenTelemetry-based observability for CloudWatch GenAI Observability.",
+    )
+    OTEL_SERVICE_NAME: str = Field(
+        default="placefinder-mcp",
+        description="Service name for OpenTelemetry tracing attribution.",
+    )
+
 
 settings = Settings()

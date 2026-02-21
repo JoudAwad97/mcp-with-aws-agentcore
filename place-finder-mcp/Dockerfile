@@ -16,4 +16,4 @@ EXPOSE 8000
 
 COPY . .
 
-CMD ["python", "-m", "src.main"]
+CMD ["opentelemetry-instrument", "python", "-m", "src.main"]

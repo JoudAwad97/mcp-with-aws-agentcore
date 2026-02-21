@@ -9,6 +9,7 @@ from fastmcp import FastMCP
 
 from src.clients.google_weather_client import GoogleWeatherClient
 from src.config import settings
+from src.infrastructure.trace_decorator import traced
 from src.schemas.weather import CurrentWeatherResponse, ForecastResponse
 from src.utils.weather_formatters import format_current_weather, format_forecast
 
@@ -50,6 +51,7 @@ def _get_client() -> GoogleWeatherClient:
         "openWorldHint": True,
     },
 )
+@traced(span_name="mcp.tool.get_current_weather", handler_type="tool")
 async def get_current_weather(
     latitude: float,
     longitude: float,
@@ -82,6 +84,7 @@ async def get_current_weather(
         "openWorldHint": True,
     },
 )
+@traced(span_name="mcp.tool.get_weather_forecast", handler_type="tool")
 async def get_weather_forecast(
     latitude: float,
     longitude: float,
