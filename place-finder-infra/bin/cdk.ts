@@ -44,4 +44,7 @@ new GatewayStack(app, `${appName}-GatewayStack`, {
   ...deploymentProps,
   runtimeId: agentCoreStack.runtime.agentRuntimeId,
   runtimeArn: agentCoreStack.runtime.agentRuntimeArn,
+  cognitoUserPoolId: agentCoreStack.cognitoUserPoolId,
+  cognitoClientId: agentCoreStack.cognitoClientId,
+  cognitoTokenEndpoint: agentCoreStack.cognitoTokenEndpoint,
 });

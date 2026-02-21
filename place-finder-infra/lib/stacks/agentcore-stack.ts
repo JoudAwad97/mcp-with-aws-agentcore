@@ -4,6 +4,7 @@ import * as agentcore from "@aws-cdk/aws-bedrock-agentcore-alpha";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as bedrock from "aws-cdk-lib/aws-bedrock";
+import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { BaseStackProps } from "../types";
 
@@ -25,6 +26,9 @@ export interface AgentCoreStackProps extends BaseStackProps {
 export class AgentCoreStack extends cdk.Stack {
   readonly runtime: agentcore.Runtime;
   readonly memory: agentcore.Memory;
+  readonly cognitoUserPoolId: string;
+  readonly cognitoClientId: string;
+  readonly cognitoTokenEndpoint: string;
 
   constructor(scope: Construct, id: string, props: AgentCoreStackProps) {
     super(scope, id, props);
@@ -113,6 +117,52 @@ export class AgentCoreStack extends cdk.Stack {
     );
 
     // =========================================================================
+    // Cognito — JWT auth for Gateway → Runtime communication
+    // =========================================================================
+
+    const userPool = new cognito.UserPool(this, "UserPool", {
+      userPoolName: `${props.appName}-pool`,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const resourceServerScope = new cognito.ResourceServerScope({
+      scopeName: "mcp",
+      scopeDescription: `MCP access to ${props.appName}`,
+    });
+
+    const resourceServer = userPool.addResourceServer("ResourceServer", {
+      identifier: `${props.appName}-api`,
+      scopes: [resourceServerScope],
+    });
+
+    const appClient = new cognito.UserPoolClient(this, "AppClient", {
+      userPool,
+      generateSecret: true,
+      oAuth: {
+        flows: { clientCredentials: true },
+        scopes: [
+          cognito.OAuthScope.resourceServer(
+            resourceServer,
+            resourceServerScope,
+          ),
+        ],
+      },
+      supportedIdentityProviders: [
+        cognito.UserPoolClientIdentityProvider.COGNITO,
+      ],
+    });
+
+    const domain = userPool.addDomain("Domain", {
+      cognitoDomain: {
+        domainPrefix: `${props.appName.toLowerCase()}-${region}`,
+      },
+    });
+
+    this.cognitoUserPoolId = userPool.userPoolId;
+    this.cognitoClientId = appClient.userPoolClientId;
+    this.cognitoTokenEndpoint = `${domain.baseUrl()}/oauth2/token`;
+
+    // =========================================================================
     // AgentCore Runtime
     // =========================================================================
 
@@ -127,6 +177,11 @@ export class AgentCoreStack extends cdk.Stack {
       protocolConfiguration: agentcore.ProtocolType.MCP,
       networkConfiguration:
         agentcore.RuntimeNetworkConfiguration.usingPublicNetwork(),
+      authorizerConfiguration:
+        agentcore.RuntimeAuthorizerConfiguration.usingCognito(
+          userPool,
+          [appClient],
+        ),
       environmentVariables: {
         // AWS
         AWS_REGION: region,
@@ -340,6 +395,24 @@ export class AgentCoreStack extends cdk.Stack {
       value: agentScopePrompt.attrArn,
       description: "Bedrock Prompt ARN for the agent scope prompt",
       exportName: `${props.appName}-AgentScopePromptArn`,
+    });
+
+    new cdk.CfnOutput(this, "CognitoUserPoolId", {
+      value: userPool.userPoolId,
+      description: "Cognito User Pool ID (for Gateway OAuth)",
+      exportName: `${props.appName}-CognitoUserPoolId`,
+    });
+
+    new cdk.CfnOutput(this, "CognitoClientId", {
+      value: appClient.userPoolClientId,
+      description: "Cognito App Client ID (for Gateway OAuth)",
+      exportName: `${props.appName}-CognitoClientId`,
+    });
+
+    new cdk.CfnOutput(this, "CognitoTokenEndpoint", {
+      value: this.cognitoTokenEndpoint,
+      description: "Cognito token endpoint URL",
+      exportName: `${props.appName}-CognitoTokenEndpoint`,
     });
   }
 }

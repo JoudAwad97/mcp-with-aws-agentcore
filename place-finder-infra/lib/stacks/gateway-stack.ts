@@ -2,6 +2,8 @@ import * as cdk from "aws-cdk-lib/core";
 import { Construct } from "constructs";
 import * as bedrockagentcore from "aws-cdk-lib/aws-bedrockagentcore";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as path from "path";
 import { BaseStackProps } from "../types";
 
 export interface GatewayStackProps extends BaseStackProps {
@@ -9,6 +11,12 @@ export interface GatewayStackProps extends BaseStackProps {
   runtimeId: string;
   /** AgentCore Runtime ARN (from AgentCoreStack output) */
   runtimeArn: string;
+  /** Cognito User Pool ID (from AgentCoreStack) */
+  cognitoUserPoolId: string;
+  /** Cognito App Client ID (from AgentCoreStack) */
+  cognitoClientId: string;
+  /** Cognito token endpoint URL (from AgentCoreStack) */
+  cognitoTokenEndpoint: string;
 }
 
 /**
@@ -16,8 +24,8 @@ export interface GatewayStackProps extends BaseStackProps {
  *
  * Provisions:
  *  - AgentCore Gateway (MCP protocol, no authorization)
- *  - Gateway Target pointing to the MCP server Runtime
- *  - IAM role for the Gateway to invoke the Runtime
+ *  - OAuth2 Credential Provider (Custom Resource)
+ *  - Gateway Target (mcpServer) with OAUTH credential provider
  *
  * WARNING: authorizerType "NONE" is for development/demo only.
  * For production, use CUSTOM_JWT or AWS_IAM.
@@ -55,6 +63,76 @@ export class GatewayStack extends cdk.Stack {
     );
 
     // =========================================================================
+    // OAuth2 Credential Provider (Custom Resource)
+    // =========================================================================
+
+    const oauthProviderFn = new lambda.Function(
+      this,
+      "OAuth2ProviderFunction",
+      {
+        runtime: lambda.Runtime.PYTHON_3_12,
+        handler: "handler.lambda_handler",
+        code: lambda.Code.fromAsset(
+          path.join(__dirname, "../lambda/oauth2-provider"),
+        ),
+        timeout: cdk.Duration.seconds(60),
+        memorySize: 256,
+        description: `Manages ${props.appName} OAuth2 credential provider in AgentCore`,
+      },
+    );
+
+    // Permissions for the custom resource Lambda
+    oauthProviderFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        sid: "CognitoDescribeClient",
+        effect: iam.Effect.ALLOW,
+        actions: ["cognito-idp:DescribeUserPoolClient"],
+        resources: [
+          `arn:aws:cognito-idp:${region}:${accountId}:userpool/${props.cognitoUserPoolId}`,
+        ],
+      }),
+    );
+    oauthProviderFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        sid: "AgentCoreOAuth2Provider",
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "bedrock-agentcore:CreateOauth2CredentialProvider",
+          "bedrock-agentcore:DeleteOauth2CredentialProvider",
+          "bedrock-agentcore:GetOauth2CredentialProvider",
+          "bedrock-agentcore:CreateTokenVault",
+          "bedrock-agentcore:GetTokenVault",
+          "secretsmanager:CreateSecret",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:PutSecretValue",
+          "sso:*",
+          "acps:*",
+        ],
+        resources: ["*"],
+      }),
+    );
+
+    const providerName = `${props.appName}-cognito-oauth`;
+
+    const oauthProvider = new cdk.CustomResource(
+      this,
+      "OAuth2CredentialProvider",
+      {
+        serviceToken: oauthProviderFn.functionArn,
+        properties: {
+          ProviderName: providerName,
+          UserPoolId: props.cognitoUserPoolId,
+          ClientId: props.cognitoClientId,
+          Region: region,
+        },
+      },
+    );
+
+    const credentialProviderArn = oauthProvider.getAttString(
+      "credentialProviderArn",
+    );
+
+    // =========================================================================
     // AgentCore Gateway
     // =========================================================================
 
@@ -67,12 +145,10 @@ export class GatewayStack extends cdk.Stack {
     });
 
     // =========================================================================
-    // Gateway Target — MCP Server (Runtime)
+    // Gateway Target — MCP Server (Runtime) with OAuth
     // =========================================================================
 
     // Construct the Runtime MCP endpoint URL.
-    // Format: https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{urlEncodedArn}/invocations?qualifier=DEFAULT
-    // The Runtime ARN must be URL-encoded (: → %3A, / → %2F).
     const encodedArn = cdk.Fn.join("", [
       "arn%3Aaws%3Abedrock-agentcore%3A",
       region,
@@ -96,6 +172,18 @@ export class GatewayStack extends cdk.Stack {
       {
         name: `${props.appName}-McpTarget`,
         gatewayIdentifier: this.gateway.attrGatewayIdentifier,
+        credentialProviderConfigurations: [
+          {
+            credentialProviderType: "OAUTH",
+            credentialProvider: {
+              oauthCredentialProvider: {
+                providerArn: credentialProviderArn,
+                scopes: [`${props.appName}-api/mcp`],
+                grantType: "CLIENT_CREDENTIALS",
+              },
+            },
+          },
+        ],
         targetConfiguration: {
           mcp: {
             mcpServer: {
@@ -107,11 +195,10 @@ export class GatewayStack extends cdk.Stack {
       },
     );
 
-    // Ensure the target is created after the gateway AND the IAM policy.
-    // Without this, CloudFormation may start GatewayTarget validation before
-    // the InvokeRuntime policy is attached, causing a permissions failure.
+    // Ensure correct creation ordering
     this.gatewayTarget.addDependency(this.gateway);
     this.gatewayTarget.node.addDependency(gatewayRole);
+    this.gatewayTarget.node.addDependency(oauthProvider);
 
     // =========================================================================
     // Stack Outputs
@@ -140,6 +227,12 @@ export class GatewayStack extends cdk.Stack {
       value: this.gatewayTarget.attrTargetId,
       description: "Gateway Target ID",
       exportName: `${props.appName}-GatewayTargetId`,
+    });
+
+    new cdk.CfnOutput(this, "OAuth2ProviderArn", {
+      value: credentialProviderArn,
+      description: "OAuth2 Credential Provider ARN",
+      exportName: `${props.appName}-OAuth2ProviderArn`,
     });
   }
 }
