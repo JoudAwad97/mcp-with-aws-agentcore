@@ -5,7 +5,6 @@ Wraps the bedrock_agentcore.memory SDK for long-term memory operations:
 - Create memory sessions
 - Add conversational turns (store preferences)
 - Search long-term memories
-- List / delete memory records
 
 The SDK is boto3-based (synchronous), so all calls are wrapped in
 asyncio.to_thread() to avoid blocking the ASGI event loop.
@@ -80,36 +79,6 @@ class AgentCoreMemoryClient:
             )
 
         return await asyncio.to_thread(_search)
-
-    async def list_preferences(self, actor_id: str) -> list:
-        """List all long-term memory records for a user."""
-        namespace = f"/preferences/{actor_id}/"
-        logger.debug(f"Listing preferences: actor={actor_id}")
-
-        def _list():
-            session = self._manager.create_memory_session(
-                actor_id=actor_id,
-                session_id=f"list-{uuid.uuid4().hex[:8]}",
-            )
-            return session.list_long_term_memory_records(
-                namespace_prefix=namespace,
-            )
-
-        return await asyncio.to_thread(_list)
-
-    async def delete_preference(self, actor_id: str, record_id: str) -> dict:
-        """Delete a specific long-term memory record."""
-        logger.debug(f"Deleting preference: actor={actor_id}, record={record_id}")
-
-        def _delete():
-            session = self._manager.create_memory_session(
-                actor_id=actor_id,
-                session_id=f"delete-{uuid.uuid4().hex[:8]}",
-            )
-            session.delete_memory_record(record_id=record_id)
-            return {"actor_id": actor_id, "record_id": record_id, "status": "deleted"}
-
-        return await asyncio.to_thread(_delete)
 
     async def close(self) -> None:
         """No persistent connection to close."""

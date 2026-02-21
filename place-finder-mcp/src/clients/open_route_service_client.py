@@ -4,9 +4,6 @@ OpenRouteService API HTTP client.
 Wraps the core endpoints:
 - POST /v2/directions/{profile}   — route between waypoints
 - GET  /geocode/search            — forward geocoding
-- GET  /geocode/reverse           — reverse geocoding
-- POST /v2/isochrones/{profile}   — reachability polygons
-- POST /v2/matrix/{profile}       — distance / duration matrix
 """
 
 import httpx
@@ -74,7 +71,7 @@ class OpenRouteServiceClient:
             f"Directions: profile={profile}, waypoints={len(coordinates)}"
         )
         response = await self._client.post(
-            f"/v2/directions/{profile}/json",
+            f"/v2/directions/{profile}",
             json=body,
         )
         response.raise_for_status()
@@ -103,94 +100,6 @@ class OpenRouteServiceClient:
 
         logger.debug(f"Geocode: text={text!r}, size={size}")
         response = await self._client.get("/geocode/search", params=params)
-        response.raise_for_status()
-        return response.json()
-
-    async def reverse_geocode(
-        self,
-        latitude: float,
-        longitude: float,
-        size: int = 1,
-    ) -> dict:
-        """Reverse geocode — convert coordinates to an address.
-
-        Args:
-            latitude: Latitude of the point.
-            longitude: Longitude of the point.
-            size: Number of results to return.
-        """
-        params = {
-            "api_key": self._client.headers["Authorization"],
-            "point.lat": latitude,
-            "point.lon": longitude,
-            "size": size,
-        }
-
-        logger.debug(f"Reverse geocode: lat={latitude}, lon={longitude}")
-        response = await self._client.get("/geocode/reverse", params=params)
-        response.raise_for_status()
-        return response.json()
-
-    async def get_isochrones(
-        self,
-        locations: list[list[float]],
-        range_seconds: list[int],
-        profile: str = "driving-car",
-        range_type: str = "time",
-    ) -> dict:
-        """Calculate isochrones (reachability areas) from locations.
-
-        Args:
-            locations: List of [longitude, latitude] origin points.
-            range_seconds: List of range values in seconds (time) or meters (distance).
-            profile: Routing profile.
-            range_type: 'time' (seconds) or 'distance' (meters).
-        """
-        body = {
-            "locations": locations,
-            "range": range_seconds,
-            "range_type": range_type,
-        }
-
-        logger.debug(
-            f"Isochrones: profile={profile}, locations={len(locations)}, "
-            f"ranges={range_seconds}"
-        )
-        response = await self._client.post(
-            f"/v2/isochrones/{profile}",
-            json=body,
-        )
-        response.raise_for_status()
-        return response.json()
-
-    async def get_matrix(
-        self,
-        locations: list[list[float]],
-        profile: str = "driving-car",
-        metrics: list[str] | None = None,
-        units: str = "km",
-    ) -> dict:
-        """Compute a distance/duration matrix between locations.
-
-        Args:
-            locations: List of [longitude, latitude] points.
-            profile: Routing profile.
-            metrics: List of metrics to compute ('distance', 'duration').
-            units: Distance units (km or mi).
-        """
-        body: dict = {
-            "locations": locations,
-            "metrics": metrics or ["distance", "duration"],
-            "units": units,
-        }
-
-        logger.debug(
-            f"Matrix: profile={profile}, locations={len(locations)}"
-        )
-        response = await self._client.post(
-            f"/v2/matrix/{profile}/json",
-            json=body,
-        )
         response.raise_for_status()
         return response.json()
 

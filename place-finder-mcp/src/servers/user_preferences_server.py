@@ -5,13 +5,15 @@ Self-contained FastMCP instance with Bedrock AgentCore Memory tools.
 Mounted into the registry via tool_registry.py.
 """
 
-from loguru import logger
 from fastmcp import FastMCP
 
 from src.clients.agentcore_memory_client import AgentCoreMemoryClient
 from src.config import settings
+from src.schemas.preferences import (
+    PreferenceListResponse,
+    StorePreferenceResponse,
+)
 from src.utils.memory_formatters import (
-    format_delete_result,
     format_memory_records,
     format_store_result,
 )
@@ -40,11 +42,27 @@ def _get_client() -> AgentCoreMemoryClient:
 # ---------------------------------------------------------------------------
 
 
-@user_preferences_mcp.tool()
+@user_preferences_mcp.tool(
+    title="Store User Preference",
+    description=(
+        "Save a user preference to long-term memory for future personalization. "
+        "Store travel preferences, dietary restrictions, budget ranges, "
+        "accommodation styles, or any other preference the user shares. "
+        "These are persisted and can be recalled later to tailor recommendations."
+    ),
+    tags={"preferences", "memory", "store", "personalization"},
+    annotations={
+        "title": "Store User Preference",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    },
+)
 async def store_user_preference(
     actor_id: str,
     preference_text: str,
-) -> str:
+) -> StorePreferenceResponse:
     """Store a preference for a user.
 
     Saves the preference to long-term memory so it can be recalled later
@@ -54,24 +72,36 @@ async def store_user_preference(
         actor_id: Unique identifier for the user (e.g. "user-123").
         preference_text: The preference to store (e.g. "I prefer vegetarian restaurants").
     """
-    try:
-        client = _get_client()
-        result = await client.store_preference(
-            actor_id=actor_id,
-            preference_text=preference_text,
-        )
-        return format_store_result(result)
-    except Exception as e:
-        logger.error(f"Error storing preference: {e}")
-        return f"Error storing preference: {e}"
+    client = _get_client()
+    result = await client.store_preference(
+        actor_id=actor_id,
+        preference_text=preference_text,
+    )
+    return format_store_result(result)
 
 
-@user_preferences_mcp.tool()
+@user_preferences_mcp.tool(
+    title="Search User Preferences",
+    description=(
+        "Semantically search a user's stored preferences by topic. "
+        "Use this to recall what the user likes or dislikes before making "
+        "recommendations. For example, search for 'food' to find dietary "
+        "preferences, or 'budget' to find spending limits."
+    ),
+    tags={"preferences", "memory", "search", "personalization"},
+    annotations={
+        "title": "Search User Preferences",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
 async def get_user_preferences(
     actor_id: str,
     query: str,
     max_results: int = 5,
-) -> str:
+) -> PreferenceListResponse:
     """Search for a user's stored preferences by semantic query.
 
     Returns the most relevant preferences matching the query.
@@ -81,55 +111,10 @@ async def get_user_preferences(
         query: What to search for (e.g. "restaurant preferences", "budget").
         max_results: Maximum number of preferences to return (1-20, default 5).
     """
-    try:
-        client = _get_client()
-        records = await client.search_preferences(
-            actor_id=actor_id,
-            query=query,
-            top_k=max_results,
-        )
-        return format_memory_records(records)
-    except Exception as e:
-        logger.error(f"Error searching preferences: {e}")
-        return f"Error searching preferences: {e}"
-
-
-@user_preferences_mcp.tool()
-async def list_user_preferences(actor_id: str) -> str:
-    """List all stored preferences for a user.
-
-    Returns every preference record stored for the given user.
-
-    Args:
-        actor_id: Unique identifier for the user (e.g. "user-123").
-    """
-    try:
-        client = _get_client()
-        records = await client.list_preferences(actor_id=actor_id)
-        return format_memory_records(records)
-    except Exception as e:
-        logger.error(f"Error listing preferences: {e}")
-        return f"Error listing preferences: {e}"
-
-
-@user_preferences_mcp.tool()
-async def delete_user_preference(
-    actor_id: str,
-    record_id: str,
-) -> str:
-    """Delete a specific stored preference.
-
-    Args:
-        actor_id: Unique identifier for the user (e.g. "user-123").
-        record_id: The ID of the preference record to delete (obtained from list/search results).
-    """
-    try:
-        client = _get_client()
-        result = await client.delete_preference(
-            actor_id=actor_id,
-            record_id=record_id,
-        )
-        return format_delete_result(result)
-    except Exception as e:
-        logger.error(f"Error deleting preference: {e}")
-        return f"Error deleting preference: {e}"
+    client = _get_client()
+    records = await client.search_preferences(
+        actor_id=actor_id,
+        query=query,
+        top_k=max_results,
+    )
+    return format_memory_records(records)

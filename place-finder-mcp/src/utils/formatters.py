@@ -1,50 +1,35 @@
 """Formatting helpers for Google Places API responses."""
 
+from src.schemas.places import Location, Place, PlaceSearchResponse
 
-def format_place(place: dict) -> str:
-    """Format a single place dict into a readable string."""
-    name = place.get("displayName", {}).get("text", "Unknown")
-    address = place.get("formattedAddress", "N/A")
+
+def format_place(place: dict) -> Place:
+    """Format a single place dict into a Place model."""
     location = place.get("location", {})
-    lat = location.get("latitude", "")
-    lng = location.get("longitude", "")
-    rating = place.get("rating", "N/A")
-    rating_count = place.get("userRatingCount", 0)
-    phone = place.get("nationalPhoneNumber", "N/A")
-    website = place.get("websiteUri", "N/A")
-    price = place.get("priceLevel", "N/A")
-    types = ", ".join(place.get("types", []))
-    summary = place.get("editorialSummary", {}).get("text", "")
-    place_id = place.get("id", "")
-
     hours_obj = place.get("regularOpeningHours", {})
-    hours_text = "; ".join(hours_obj.get("weekdayDescriptions", []))
 
-    lines = [
-        f"Name: {name}",
-        f"Address: {address}",
-        f"Location: {lat}, {lng}",
-        f"Rating: {rating} ({rating_count} reviews)",
-        f"Phone: {phone}",
-        f"Website: {website}",
-        f"Price Level: {price}",
-        f"Types: {types}",
-    ]
-    if summary:
-        lines.append(f"Summary: {summary}")
-    if hours_text:
-        lines.append(f"Hours: {hours_text}")
-    if place_id:
-        lines.append(f"Place ID: {place_id}")
-
-    return "\n".join(lines)
+    return Place(
+        name=place.get("displayName", {}).get("text", "Unknown"),
+        address=place.get("formattedAddress"),
+        location=Location(
+            latitude=location.get("latitude"),
+            longitude=location.get("longitude"),
+        ),
+        rating=place.get("rating"),
+        review_count=place.get("userRatingCount"),
+        phone=place.get("nationalPhoneNumber"),
+        website=place.get("websiteUri"),
+        price_level=place.get("priceLevel"),
+        types=place.get("types", []),
+        summary=place.get("editorialSummary", {}).get("text"),
+        opening_hours=hours_obj.get("weekdayDescriptions", []),
+        place_id=place.get("id"),
+    )
 
 
-def format_places(places: list[dict]) -> str:
-    """Format a list of places into a numbered result string."""
-    if not places:
-        return "No places found."
-    parts = []
-    for i, place in enumerate(places, 1):
-        parts.append(f"--- Result {i} ---\n{format_place(place)}")
-    return "\n\n".join(parts)
+def format_places(places: list[dict]) -> PlaceSearchResponse:
+    """Format a list of places into a PlaceSearchResponse model."""
+    return PlaceSearchResponse(
+        count=len(places),
+        places=[format_place(p) for p in places],
+    )
