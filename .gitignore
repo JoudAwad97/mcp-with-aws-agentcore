@@ -45,5 +45,8 @@ cdk.out/
 *.pem
 *.key
 
+# ---- Local docs (contains account-specific IDs) ----
+CONNECT.md
+
 # ---- Claude Code (local settings) ----
 .claude/settings.local.json

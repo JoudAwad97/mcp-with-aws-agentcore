@@ -52,6 +52,19 @@ export class AgentCoreStack extends cdk.Stack {
       },
     });
 
+    const openRouteServiceSecret = new secretsmanager.Secret(
+      this,
+      "OpenRouteServiceSecret",
+      {
+        secretName: `${props.appName}/openrouteservice-api-key`,
+        description:
+          "OpenRouteService API key for routing & geocoding. Update after deployment.",
+        secretObjectValue: {
+          api_key: cdk.SecretValue.unsafePlainText(""),
+        },
+      },
+    );
+
     // =========================================================================
     // AgentCore Memory
     // =========================================================================
@@ -190,8 +203,14 @@ export class AgentCoreStack extends cdk.Stack {
         AGENTCORE_MEMORY_ID: this.memory.memoryId,
         BEDROCK_PROMPT_ID: agentScopePrompt.attrId,
 
-        // Google API key is fetched by the app via Secrets Manager
-        GOOGLE_API_SECRET_NAME: googleApiSecret.secretName,
+        // API keys (resolved from Secrets Manager at deploy time)
+        GOOGLE_PLACES_API_KEY: googleApiSecret
+          .secretValueFromJson("api_key")
+          .unsafeUnwrap(),
+        OPEN_ROUTE_SERVICE_API_KEY: openRouteServiceSecret
+          .secretValueFromJson("api_key")
+          .unsafeUnwrap(),
+        PROMPT_CACHE_TTL_SECONDS: "300",
 
         // OpenTelemetry observability
         AGENT_OBSERVABILITY_ENABLED: "true",
@@ -244,8 +263,9 @@ export class AgentCoreStack extends cdk.Stack {
       }),
     );
 
-    // Secrets Manager — read Google API key at runtime
+    // Secrets Manager — read API keys at runtime
     googleApiSecret.grantRead(this.runtime);
+    openRouteServiceSecret.grantRead(this.runtime);
 
     // AgentCore Memory — full access to memory resources
     this.runtime.addToRolePolicy(
