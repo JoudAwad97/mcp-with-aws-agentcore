@@ -27,5 +27,11 @@ class Settings(BaseSettings):
         description="API key for Google Places API (New).",
     )
 
+    # --- OpenRouteService API ---
+    OPEN_ROUTE_SERVICE_API_KEY: str = Field(
+        default="",
+        description="API key for OpenRouteService (routing, geocoding, isochrones).",
+    )
+
 
 settings = Settings()

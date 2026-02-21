@@ -9,7 +9,7 @@ import httpx
 from loguru import logger
 from fastmcp import FastMCP
 
-from src.clients.google_weather import GoogleWeatherClient
+from src.clients.google_weather_client import GoogleWeatherClient
 from src.config import settings
 from src.utils.weather_formatters import format_current_weather, format_forecast
 

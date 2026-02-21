@@ -7,9 +7,10 @@ Aggregates all MCP servers into a single FastMCP instance with prefix namespacin
 from loguru import logger
 from fastmcp import FastMCP
 
-from src.servers.place_finder import place_finder_mcp
-from src.servers.user_preferences import user_preferences_mcp
-from src.servers.weather import weather_mcp
+from src.servers.place_finder_server import place_finder_mcp
+from src.servers.open_route_service_server import open_route_service_mcp
+from src.servers.user_preferences_server import user_preferences_mcp
+from src.servers.weather_server import weather_mcp
 
 
 class McpServersRegistry:
@@ -27,8 +28,7 @@ class McpServersRegistry:
         self.registry.mount(place_finder_mcp, namespace="places")
         self.registry.mount(weather_mcp, namespace="weather")
         self.registry.mount(user_preferences_mcp, namespace="preferences")
-        # Future servers:
-        # self.registry.mount(events_mcp, namespace="events")
+        self.registry.mount(open_route_service_mcp, namespace="routing")
 
         self._is_initialized = True
 

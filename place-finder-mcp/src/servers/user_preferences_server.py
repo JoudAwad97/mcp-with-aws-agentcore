@@ -8,7 +8,7 @@ Mounted into the registry via tool_registry.py.
 from loguru import logger
 from fastmcp import FastMCP
 
-from src.clients.agentcore_memory import AgentCoreMemoryClient
+from src.clients.agentcore_memory_client import AgentCoreMemoryClient
 from src.config import settings
 from src.utils.memory_formatters import (
     format_delete_result,

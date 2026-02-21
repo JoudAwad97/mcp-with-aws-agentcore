@@ -9,7 +9,7 @@ import httpx
 from loguru import logger
 from fastmcp import FastMCP
 
-from src.clients.google_places import GooglePlacesClient
+from src.clients.google_places_client import GooglePlacesClient
 from src.config import settings
 from src.utils.formatters import format_place, format_places
 
