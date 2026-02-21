@@ -30,7 +30,17 @@ class Settings(BaseSettings):
     # --- OpenRouteService API ---
     OPEN_ROUTE_SERVICE_API_KEY: str = Field(
         default="",
-        description="API key for OpenRouteService (routing, geocoding, isochrones).",
+        description="API key for OpenRouteService (routing, geocoding).",
+    )
+
+    # --- Bedrock Prompt Management ---
+    BEDROCK_PROMPT_ID: str = Field(
+        default="",
+        description="Bedrock Prompt Management prompt identifier for the agent scope prompt.",
+    )
+    PROMPT_CACHE_TTL_SECONDS: int = Field(
+        default=300,
+        description="TTL in seconds for the prompt text cache.",
     )
 
 

@@ -2,6 +2,7 @@
 MCP Tool Registry.
 
 Aggregates all MCP servers into a single FastMCP instance with prefix namespacing.
+Syncs local prompt definitions to Bedrock on startup.
 """
 
 from loguru import logger
@@ -9,8 +10,10 @@ from fastmcp import FastMCP
 
 from src.servers.place_finder_server import place_finder_mcp
 from src.servers.open_route_service_server import open_route_service_mcp
+from src.servers.prompt_server import prompt_mcp
 from src.servers.user_preferences_server import user_preferences_mcp
 from src.servers.weather_server import weather_mcp
+from src.infrastructure.bedrock_prompt_manager import get_prompt_manager
 
 
 class McpServersRegistry:
@@ -25,16 +28,32 @@ class McpServersRegistry:
 
         logger.info("Initializing MCP tool registry...")
 
+        # --- Sync prompts to Bedrock before mounting ---
+        try:
+            manager = get_prompt_manager()
+            await manager.sync_all_prompts()
+        except Exception:
+            logger.exception(
+                "Prompt sync failed. Server will continue with "
+                "existing Bedrock DRAFT content."
+            )
+
+        # --- Mount servers ---
         self.registry.mount(place_finder_mcp, namespace="places")
         self.registry.mount(weather_mcp, namespace="weather")
         self.registry.mount(user_preferences_mcp, namespace="preferences")
         self.registry.mount(open_route_service_mcp, namespace="routing")
+        self.registry.mount(prompt_mcp, namespace="prompts")
 
         self._is_initialized = True
 
         all_tools = await self.registry.list_tools()
         tool_names = [t.name for t in all_tools]
         logger.info(f"Registry initialized with {len(all_tools)} tools: {tool_names}")
+
+        all_prompts = await self.registry.list_prompts()
+        prompt_names = [p.name for p in all_prompts]
+        logger.info(f"Registry initialized with {len(all_prompts)} prompts: {prompt_names}")
 
     def get_registry(self) -> FastMCP:
         return self.registry

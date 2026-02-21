@@ -3,6 +3,7 @@ import { Construct } from "constructs";
 import * as agentcore from "@aws-cdk/aws-bedrock-agentcore-alpha";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as bedrock from "aws-cdk-lib/aws-bedrock";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { BaseStackProps } from "../types";
 
@@ -18,6 +19,7 @@ export interface AgentCoreStackProps extends BaseStackProps {
  *  - Secrets Manager secret for the Google API key
  *  - AgentCore Runtime (container-based MCP server)
  *  - AgentCore Memory (user preference + semantic + summary strategies)
+ *  - Bedrock Prompt (agent scope prompt for tool orchestration)
  *  - X-Ray / CloudWatch observability
  */
 export class AgentCoreStack extends cdk.Stack {
@@ -66,6 +68,51 @@ export class AgentCoreStack extends cdk.Stack {
     });
 
     // =========================================================================
+    // Bedrock Prompt — Agent Scope Prompt
+    // =========================================================================
+
+    const agentScopePrompt = new bedrock.CfnPrompt(
+      this,
+      "AgentScopePrompt",
+      {
+        name: `${props.appName}-agent-scope-prompt`,
+        description:
+          "Holiday planner agent scope prompt — guides LLMs on how to orchestrate all MCP tools.",
+        defaultVariant: "default",
+        variants: [
+          {
+            name: "default",
+            modelId: "anthropic.claude-sonnet-4-20250514",
+            templateType: "TEXT",
+            templateConfiguration: {
+              text: {
+                text: "Managed by application. See src/prompts/ for source of truth.",
+              },
+            },
+            inferenceConfiguration: {
+              text: {
+                temperature: 0,
+                topP: 1,
+                maxTokens: 4096,
+              },
+            },
+          },
+        ],
+      },
+    );
+
+    // Initial version — subsequent versions auto-managed by the Python app
+    const agentScopePromptVersion = new bedrock.CfnPromptVersion(
+      this,
+      "AgentScopePromptV1",
+      {
+        promptArn: agentScopePrompt.attrArn,
+        description:
+          "Initial CDK-deployed version. Subsequent versions auto-managed by app.",
+      },
+    );
+
+    // =========================================================================
     // AgentCore Runtime
     // =========================================================================
 
@@ -86,6 +133,7 @@ export class AgentCoreStack extends cdk.Stack {
 
         // AgentCore resources
         AGENTCORE_MEMORY_ID: this.memory.memoryId,
+        BEDROCK_PROMPT_ID: agentScopePrompt.attrId,
 
         // Google API key is fetched by the app via Secrets Manager
         GOOGLE_API_SECRET_NAME: googleApiSecret.secretName,
@@ -152,6 +200,25 @@ export class AgentCoreStack extends cdk.Stack {
         actions: ["bedrock-agentcore:*"],
         resources: [
           `arn:aws:bedrock-agentcore:${region}:${accountId}:memory/*`,
+        ],
+      }),
+    );
+
+    // Bedrock Prompt Management — full lifecycle (read, update, version, delete)
+    this.runtime.addToRolePolicy(
+      new iam.PolicyStatement({
+        sid: "BedrockPromptManagement",
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "bedrock:GetPrompt",
+          "bedrock:UpdatePrompt",
+          "bedrock:CreatePromptVersion",
+          "bedrock:ListPrompts",
+          "bedrock:DeletePrompt",
+        ],
+        resources: [
+          agentScopePrompt.attrArn,
+          `${agentScopePrompt.attrArn}:*`,
         ],
       }),
     );
@@ -261,6 +328,18 @@ export class AgentCoreStack extends cdk.Stack {
       value: googleApiSecret.secretArn,
       description: "Google API key secret ARN",
       exportName: `${props.appName}-GoogleApiSecretArn`,
+    });
+
+    new cdk.CfnOutput(this, "AgentScopePromptId", {
+      value: agentScopePrompt.attrId,
+      description: "Bedrock Prompt ID for the agent scope prompt",
+      exportName: `${props.appName}-AgentScopePromptId`,
+    });
+
+    new cdk.CfnOutput(this, "AgentScopePromptArn", {
+      value: agentScopePrompt.attrArn,
+      description: "Bedrock Prompt ARN for the agent scope prompt",
+      exportName: `${props.appName}-AgentScopePromptArn`,
     });
   }
 }
