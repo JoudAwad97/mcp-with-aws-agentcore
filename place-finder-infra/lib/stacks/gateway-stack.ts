@@ -70,8 +70,25 @@ export class GatewayStack extends cdk.Stack {
     // Gateway Target — MCP Server (Runtime)
     // =========================================================================
 
-    // Construct the Runtime MCP endpoint URL
-    const runtimeEndpoint = `https://bedrock-agentcore-runtime.${region}.amazonaws.com/runtimes/${props.runtimeId}`;
+    // Construct the Runtime MCP endpoint URL.
+    // Format: https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{urlEncodedArn}/invocations?qualifier=DEFAULT
+    // The Runtime ARN must be URL-encoded (: → %3A, / → %2F).
+    const encodedArn = cdk.Fn.join("", [
+      "arn%3Aaws%3Abedrock-agentcore%3A",
+      region,
+      "%3A",
+      accountId,
+      "%3Aruntime%2F",
+      props.runtimeId,
+    ]);
+
+    const runtimeEndpoint = cdk.Fn.join("", [
+      "https://bedrock-agentcore.",
+      region,
+      ".amazonaws.com/runtimes/",
+      encodedArn,
+      "/invocations?qualifier=DEFAULT",
+    ]);
 
     this.gatewayTarget = new bedrockagentcore.CfnGatewayTarget(
       this,
@@ -86,9 +103,6 @@ export class GatewayStack extends cdk.Stack {
             },
           },
         },
-        // NoAuth: omit credentialProviderConfigurations entirely.
-        // MCP server targets support NoAuth (no outbound credentials).
-        // For production, use OAUTH with a registered credential provider.
         description: "MCP server target pointing to the AgentCore Runtime",
       },
     );

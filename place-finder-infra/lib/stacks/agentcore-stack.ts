@@ -124,7 +124,7 @@ export class AgentCoreStack extends cdk.Stack {
       runtimeName: `${props.appName}_mcp`,
       agentRuntimeArtifact: artifact,
       description: `${props.appName} MCP server (Places, Weather, User Preferences)`,
-      protocolConfiguration: agentcore.ProtocolType.HTTP,
+      protocolConfiguration: agentcore.ProtocolType.MCP,
       networkConfiguration:
         agentcore.RuntimeNetworkConfiguration.usingPublicNetwork(),
       environmentVariables: {
