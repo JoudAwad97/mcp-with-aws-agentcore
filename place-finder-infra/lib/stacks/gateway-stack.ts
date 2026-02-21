@@ -107,8 +107,11 @@ export class GatewayStack extends cdk.Stack {
       },
     );
 
-    // Ensure the target is created after the gateway
+    // Ensure the target is created after the gateway AND the IAM policy.
+    // Without this, CloudFormation may start GatewayTarget validation before
+    // the InvokeRuntime policy is attached, causing a permissions failure.
     this.gatewayTarget.addDependency(this.gateway);
+    this.gatewayTarget.node.addDependency(gatewayRole);
 
     // =========================================================================
     // Stack Outputs
