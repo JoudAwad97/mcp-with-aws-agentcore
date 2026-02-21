@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib";
 import { BaseStackProps } from "../lib/types";
-import { EcrStack, AgentCoreStack } from "../lib/stacks";
+import { EcrStack, AgentCoreStack, GatewayStack } from "../lib/stacks";
 
 const app = new cdk.App();
 
@@ -34,7 +34,14 @@ if (existingImageUri) {
 }
 
 // AgentCore stack — Runtime, Memory, Observability
-new AgentCoreStack(app, `${appName}-AgentCoreStack`, {
+const agentCoreStack = new AgentCoreStack(app, `${appName}-AgentCoreStack`, {
   ...deploymentProps,
   imageUri,
+});
+
+// Gateway stack — MCP Gateway exposing the Runtime
+new GatewayStack(app, `${appName}-GatewayStack`, {
+  ...deploymentProps,
+  runtimeId: agentCoreStack.runtime.agentRuntimeId,
+  runtimeArn: agentCoreStack.runtime.agentRuntimeArn,
 });
